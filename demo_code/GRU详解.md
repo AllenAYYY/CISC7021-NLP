@@ -21,7 +21,7 @@
 
 结合 x^t 和 ℎ^t-1，GRU会得到当前隐藏节点的输出 y^t 和传递给下一个节点的隐状态 ℎ^t 。
 
-![image-20231106215853986](.\imgs\GRU_input_putput)
+![image-20231106215853986](.\imgs\GRU_input_putput.png)
 
 
 
@@ -29,7 +29,7 @@
 
 - 重置门控（reset gate）：
 
-  ![image-20231106220159187](.\imgs\Reset_Gate)
+  ![image-20231106220159187](.\imgs\Reset_Gate.png)
 
   ```markdown
   sigmoid函数，通过这个函数可以将数据变换为0-1范围内的数值，从而来充当门控信号。
@@ -37,23 +37,23 @@
 
   数据经过重置门得到重置后的数据:
 
-  ![image-20231106220836068](.\imgs\reset_data)
+  ![image-20231106220836068](.\imgs\reset_data.png)
 
   再将 ℎ^t-1′ 与输入 x^t进行拼接，再通过一个[tanh](https://link.zhihu.com/?target=https%3A//baike.baidu.com/item/tanh)激活函数来将数据放缩到**-1~1**的范围内。即得到如下图所示的 ℎ′ 。
 
-  ![image-20231106221008038](.\imgs\reset_data_2)
+  ![image-20231106221008038](.\imgs\reset_data_2.png)
 
   这里的 ℎ′ 主要是包含了当前输入的 x^t 数据。有针对性地对 ℎ′ 添加到当前的隐藏状态，相当于”记忆了当前时刻的状态。
 
 - 更新门控（update gate）：
 
-  ![image-20231106220406122](.\imgs\Update_Gate)
+  ![image-20231106220406122](.\imgs\Update_Gate.png)
 
   这个阶段进行了“遗忘”和“记忆”两个步骤。
 
   更新表达式如下：
 
-  ![image-20231106221404007](.\imgs\update)
+  ![image-20231106221404007](.\imgs\update.png)
 
   ```markdown
   注：这里的门控信号z范围为0-1，门控信号接近1代表记忆下来的数据越多，越接近0代表遗忘的数据越多。
@@ -66,6 +66,6 @@
 
 ### 整体结构
 
-![image-20231106221843532](.\imgs\GRU)
+![image-20231106221843532](.\imgs\GRU.png)
 
  
