@@ -1,0 +1,4 @@
+data_fr_en/Language_model.zip filter=lfs diff=lfs merge=lfs -text
+data_fr_en/train_language_model.zip filter=lfs diff=lfs merge=lfs -text
+data_fr_en/train_RNN/train_src.zip filter=lfs diff=lfs merge=lfs -text
+data_fr_en/train_RNN/train_trg.zip filter=lfs diff=lfs merge=lfs -text
