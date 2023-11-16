@@ -1,0 +1,13 @@
+Train_data Description:
+The final train data is 
+train.src.ranked.5
+train.trg.ranked.5
+
+
+Original data are:
+train.src  --> French
+train.trg  --> English
+
+After Data Selection , finally we obtain 12 ranks of each French and Englsh selected train data
+The size from 1 to 12 is decreasing.
+Thus dynamically choose the suit size of the train_data
