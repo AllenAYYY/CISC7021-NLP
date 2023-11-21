@@ -17,6 +17,7 @@ import datetime
 import pickle
 from model.model import Encoder,Decoder,Seq2Seq
 from dataloader import DataLoaderBuildVocab,read_data_to_dataloader,preprocess_sentence
+from utils import test_model
 import os
 
 # 环境变量防止.ddl重复
@@ -37,80 +38,12 @@ data_loader.read_to_build_vocab()
 SRC_VOCAB = data_loader.SRC_VOCAB
 TGT_VOCAB = data_loader.TGT_VOCAB
 
-# 测试模型
-def test_model(src_path, tgt_path, batch_size,enb_dim,hidden_dim):
-    '''
-    :description: 用以实现模型测试
-    :param src_path: 验证集源语言的src_path
-    :param tgt_path:  验证集目标语言的tgt_path
-    :param batch_size: 批处理大小
-    :param enb_dim: 词映射为vector的尺寸
-    :param hidden_dim: 隐藏层维度
-    :return: None. Only print
-    '''
-    data_loader = DataLoaderBuildVocab(src_path, tgt_path)
-    data_loader.read_to_build_vocab()
-    src_vocab = data_loader.SRC_VOCAB
-    tgt_vocab = data_loader.TGT_VOCAB
-    src_vocab_size = len(data_loader.SRC_VOCAB)
-    tgt_vocab_size = len(data_loader.TGT_VOCAB)
-    # 实例化 编码器和解码器 和模型
-    encoder = Encoder(enb_dim, src_vocab_size, hidden_dim)
-    decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim)
-    model = Seq2Seq(encoder, decoder)
-    model.eval()  # 切换为评估模式，不进行梯度计算
-    criterion = nn.NLLLoss() # 采用nn.NLLLOSS()计算损失
-    total_loss = 0
-    total_samples = 0
 
-    with torch.no_grad():  # 禁用梯度计算
-        for loader_src, loader_tgt in zip(read_data_to_dataloader(src_path, batch_size),read_data_to_dataloader(tgt_path,batch_size)):
-            for src_item, tgt_item in zip(loader_src, loader_tgt):
-                # 分词后的句子，根据对应语言的词表，生成代表词含义的vector
-                src_idx = torch.LongTensor([src_vocab[i] for i in src_item.split()])
-                tgt_idx = torch.LongTensor([tgt_vocab[i] for i in tgt_item.split()])
-                # 将每一个节点的vector传入list中。
-                vector_list = [x.unsqueeze(0) for x in src_idx]
-                # 第一轮要经过embedding层，后续则不需要
-                is_first_round = True
-                # 当列表中只有一个节点时代表递归完成
-                while len(vector_list) > 1:
-                    num_vector = len(vector_list)
-                    count = 0
-                    step = 0
-                    list = []
-                    # 判断存在下一个节点
-                    while count + 1 < num_vector:
-                        if is_first_round: # 第一轮要经过embedding层，后续则不需要
-                            embedded_left = encoder.embeddingl(vector_list[count])
-                            embedded_right = encoder.embeddingr(vector_list[count + 1])
-                        else:
-                            embedded_left = vector_list[count]
-                            embedded_right = vector_list[count + 1]
-                        # 传入模型
-                        output_hidden = model(embedded_left, embedded_right, tgt_idx, is_first_round)
-                        #print(f"count{count}成功")
-                        count += 1
-                        #print(f"output_hidden.size()    {output_hidden.size()}")
-                        list.append(output_hidden)
-                    is_first_round = False
-                    vector_list = list
-                    step += 1
-                # 列表只剩下一个值为最终输出
-                output = vector_list[0]
-                output = output.expand(len(tgt_idx), -1)
-                # 计算模型输出的序列和目标语言的序列之间的loss
-                loss = criterion(output, tgt_idx)
-                #loss = criterion(output.view(-1, output.shape[-1]), tgt_idx.view(-1))
-                total_loss += loss.item() * len(src_idx)
-                total_samples += len(src_idx)
-    # 计算平均损失
-    avg_loss = total_loss / total_samples
-    print(f"valid test Loss: {avg_loss:.4f}")
 
 # 保存词表
 def save_vocab(vocab,epoch,tag):
-    file_path = "./model/vocab_result/" + f"vocab_epoch{epoch}_{tag}.pt"
+    #file_path = "./model/vocab_result/" + f"vocab_epoch{epoch}_{tag}.pt"
+    file_path = "./model/vocab_result/" + f"vocab_{tag}.pt"
     with open(file_path, 'wb') as f:
         pickle.dump(vocab, f)
 
@@ -133,7 +66,8 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
     tgt_vocab = TGT_VOCAB
     save_vocab(SRC_VOCAB,num_epoch,"src")
     save_vocab(TGT_VOCAB,num_epoch,"tgt")
-    print(src_vocab)
+    print(f"src词汇表 {src_vocab}")
+    print(f"tgt词汇表 {tgt_vocab}")
     src_vocab_size = len(data_loader.SRC_VOCAB)
     tgt_vocab_size = len(data_loader.TGT_VOCAB)
     # 实例化编码器、解码器和模型
@@ -145,16 +79,26 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
     criterion = nn.NLLLoss() # 采用NLLLOSS损失函数
     loss_result = 0
     loss_history = []
+    src_unk_index = src_vocab['<unk>']
+    tgt_unk_index = tgt_vocab['<unk>']
     for epoch in range(1,num_epoch+1):
         # 加载批次loader
         for loader_src,loader_tgt in zip(read_data_to_dataloader(train_src_path, batch_size),read_data_to_dataloader(train_tgt_path,batch_size)):
             #print(f"源{loader_src},目标{loader_tgt}")
             # 加载批中的每一对训练语言
             for src_item,tgt_item in zip(loader_src,loader_tgt):
+                src_item = preprocess_sentence(src_item)
+                tgt_item = preprocess_sentence(tgt_item)
                 #print(f"源{src_item},目标{tgt_item}")
                 # 从词表获取语言序列
-                src_idx = torch.LongTensor([src_vocab[i] for i in src_item.split()])
-                tgt_idx = torch.LongTensor([tgt_vocab[i] for i in tgt_item.split()])
+                #src_idx = torch.LongTensor([src_vocab[i] for i in src_item.split()])
+                #tgt_idx = torch.LongTensor([tgt_vocab[i] for i in tgt_item.split()])
+                # 找不到就转成未知词
+
+
+                src_idx = torch.LongTensor([src_vocab.get(i, src_unk_index) for i in src_item.split()])
+                #print(src_idx)
+                tgt_idx = torch.LongTensor([tgt_vocab.get(i, tgt_unk_index) for i in tgt_item.split()])
                 optimizer.zero_grad()
                 # 传入列表
                 # 改处while循环和model中的编码器部分共同构成了论文中的递归神经网络结构
@@ -170,31 +114,41 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
                     list = []
                     # 不存在下一个节点时迭代完成
                     while count + 1 < num_vector:
-                        if is_first_round: # 第一轮经过embedding将词序列编码
+                        if is_first_round:  # 第一轮要经过embedding层，后续则不需要
                             embedded_left = encoder.embeddingl(vector_list[count])
                             embedded_right = encoder.embeddingr(vector_list[count + 1])
-                        else: # only第一轮需要，后面不需要
+                        else:
                             embedded_left = vector_list[count]
                             embedded_right = vector_list[count + 1]
-                        output_hidden = model(embedded_left, embedded_right, tgt_idx, is_first_round)
+                        # 传入模型
+                        # output_hidden = model(embedded_left, embedded_right, tgt_idx, is_first_round)
+                        output_hidden = encoder(embedded_left, embedded_right, is_first_round)
+                        # print(f"count{count}成功")
                         count += 1
+                        # print(f"output_hidden.size()    {output_hidden.size()}")
                         list.append(output_hidden)
                     is_first_round = False
                     vector_list = list
                     step += 1
+                # 列表只剩下一个值为最终输出
                 output = vector_list[0]
-                output = output.expand(len(tgt_idx), -1)
+                #print(f"outputsize{output.size()}")
+                output, hidden = decoder(tgt_idx, output)
+                #print(f"output    {output}")
+                #output = output.expand(len(tgt_idx), -1)
+                #print(f"output_size:{output.size()}")
+                #print(f"tgt_size:{tgt_idx.size()}")
 
                 # 解码器输出和目标语言的序列计算loss
                 loss = criterion(output, tgt_idx)
                 loss.backward()
                 loss_result = loss.item()
-                print(f"第{epoch}轮 Train Loss: {loss_result}")
                 optimizer.step()
         loss_history.append(loss_result)
+        print(f"第{epoch}轮 Train Loss: {loss_result}")
         if epoch  % 10 == 0:
-            print(f"Epoch: {epoch}, Valid Loss: {loss_result:.4f}")
-            test_model(valid_src_path,valid_tgt_path,batch_size,enb_dim,hidden_dim)
+            #print(f"Epoch: {epoch}, Valid Loss: {loss_result:.4f}")
+            test_model(valid_src_path,valid_tgt_path,batch_size,enb_dim,hidden_dim,"valid")
         if epoch % 50 == 0:
             current_time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             model_path = f"./model/model_result/model_epoch{epoch}_{current_time}.pt"
@@ -216,5 +170,5 @@ if __name__ == '__main__':
     valid_tgt_path = "./datasets/valid/valid.tgt.en"
     test_src_path = "./datasets/test/test.src.fr"
     test_tgt_path = "./datasets/test/test.tgt.en"
-    train_model(src_file_path, tgt_file_path, valid_src_path, valid_tgt_path, batch_size=50)
+    train_model(src_file_path, tgt_file_path, valid_src_path, valid_tgt_path,num_epoch=100)
 
