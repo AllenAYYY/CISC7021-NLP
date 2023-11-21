@@ -11,10 +11,9 @@
 import random
 
 # import package
-import torch
+import nltk
 from nltk.tokenize import word_tokenize
 from torch.utils.data import Dataset, DataLoader
-from utils import Field
 import spacy
 import re
 
@@ -65,7 +64,7 @@ class DataLoaderBuildVocab:
 # 预处理，包括替换引号，删掉常用的一些标点符号
 # 这一步是给输入的句子做预处理而不是给构建词表做预处理
 def preprocess_sentence(sentence,init_token='<sos>',end_token='<eos>'):
-    sentence = sentence.replace("'", "")  # 替换单引号为无
+    #sentence = sentence.replace("'", "")  # 替换单引号为无
     sentence = re.sub(r"([^\s\w]|_)+", " ", sentence)
     # 使用nltk分词工具进行分词
     tokens = word_tokenize(sentence)
@@ -81,6 +80,45 @@ def preprocess_sentence(sentence,init_token='<sos>',end_token='<eos>'):
     print(preprocess_tokens)
     return preprocessed_sentence
 
+class Field:
+    def __init__(self, tokenize_fn=None, lower=False, init_token=None, eos_token=None):
+        self.tokenize_fn = tokenize_fn
+        self.lower = lower
+        self.init_token = init_token
+        self.eos_token = eos_token
+        self.vocab = {}
+
+    # 构建词表
+    def build_vocab(self, data):
+        tokens = []
+        # 添加开始符号和结束符号
+        if self.init_token:
+            tokens.append(self.init_token)
+        if self.eos_token:
+            tokens.append(self.eos_token)
+        # 对句子做分词
+        for sentence in data:
+            sentence_tokens = self.tokenize_fn(sentence)
+            # 转小写
+            if self.lower:
+                sentence_tokens = [token.lower() for token in sentence_tokens]
+            tokens.extend(sentence_tokens)
+        # 构建字典
+        freq_dist = nltk.FreqDist(tokens)
+        # 生成词表
+        self.vocab = {token: idx for idx, (token, _) in enumerate(freq_dist.items())}
+        # 添加未知词符号
+        self.vocab['<unk>'] = len(self.vocab)
+        return self.vocab
+
+    def numericalize(self, data):
+        if self.lower:
+            data = [token.lower() for token in data]
+        if self.init_token:
+            data = [self.init_token] + data
+        if self.eos_token:
+            data = data + [self.eos_token]
+        return [self.vocab[token] for token in data]
 
 class MyDataset(Dataset):
     def __init__(self, file_path):
