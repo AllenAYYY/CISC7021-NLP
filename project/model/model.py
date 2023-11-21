@@ -23,8 +23,8 @@ class Seq2Seq(nn.Module):
 
     def forward(self, left_hidden, right_hidden,tgt,is_first):
         encoder_output = self.encoder(left_hidden,right_hidden,is_first)
-        output = self.decoder(tgt,encoder_output,encoder_output)
-        return output
+        output,hidden = self.decoder(tgt,encoder_output,encoder_output)
+        return output,hidden
 
 # 编码器
 class Encoder(nn.Module):
@@ -80,12 +80,13 @@ class Decoder(nn.Module):
         self.linear = nn.Linear(hidden_dim, hidden_dim)
         self.softmax = nn.LogSoftmax(dim=1)
 
-    def forward(self, tgt, hidden, encoder_output):
-        embedded = self.embedding(tgt)
+    def forward(self, input,hidden):
+        embedded = self.embedding(input)
+        #print(f"embeded   {embedded}")
         output, hidden = self.gru(embedded, hidden)
-        prediction = self.linear(hidden)
-        prediction = self.softmax(prediction)
-        return prediction
+        output = self.linear(output)
+        output = self.softmax(output)
+        return output,hidden
 
 # 仅用来测试本文件模型是否能正常运行，不是模型训练函数
 def train(model, input_seq, target_seq, criterion, optimizer):
