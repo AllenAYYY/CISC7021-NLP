@@ -9,89 +9,115 @@
 
 """
 # import package
-import nltk
 from nltk.tokenize import word_tokenize
+import torch
+import torch.nn as nn
+from model.model import Encoder,Decoder,Seq2Seq
+from dataloader import DataLoaderBuildVocab,read_data_to_dataloader
+from nltk.translate.bleu_score import corpus_bleu
+
+
 
 # 数据预处理
-class Field:
-    def __init__(self, tokenize_fn=None, lower=False, init_token=None, eos_token=None):
-        self.tokenize_fn = tokenize_fn
-        self.lower = lower
-        self.init_token = init_token
-        self.eos_token = eos_token
-        self.vocab = {}
 
-    # 构建词表
-    def build_vocab(self, data):
-        tokens = []
-        # 添加开始符号和结束符号
-        if self.init_token:
-            tokens.append(self.init_token)
-        if self.eos_token:
-            tokens.append(self.eos_token)
-        # 对句子做分词
-        for sentence in data:
-            sentence_tokens = self.tokenize_fn(sentence)
-            # 转小写
-            if self.lower:
-                sentence_tokens = [token.lower() for token in sentence_tokens]
-            tokens.extend(sentence_tokens)
-        # 构建字典
-        freq_dist = nltk.FreqDist(tokens)
-        # 生成词表
-        self.vocab = {token: idx for idx, (token, _) in enumerate(freq_dist.items())}
-        # 添加未知词符号
-        self.vocab['<unk>'] = len(self.vocab)
-        return self.vocab
 
-    def numericalize(self, data):
-        if self.lower:
-            data = [token.lower() for token in data]
-        if self.init_token:
-            data = [self.init_token] + data
-        if self.eos_token:
-            data = data + [self.eos_token]
-        return [self.vocab[token] for token in data]
+# 测试模型
+def test_model(src_path, tgt_path, batch_size,enb_dim,hidden_dim,mod):
+    '''
+    :description: 用以实现模型测试
+    :param src_path: 验证集源语言的src_path
+    :param tgt_path:  验证集目标语言的tgt_path
+    :param batch_size: 批处理大小
+    :param enb_dim: 词映射为vector的尺寸
+    :param hidden_dim: 隐藏层维度
+    :return: None. Only print
+    '''
+    data_loader = DataLoaderBuildVocab(src_path, tgt_path)
+    data_loader.read_to_build_vocab()
+    src_vocab = data_loader.SRC_VOCAB
+    tgt_vocab = data_loader.TGT_VOCAB
+    src_vocab_size = len(data_loader.SRC_VOCAB)
+    tgt_vocab_size = len(data_loader.TGT_VOCAB)
+    # 实例化 编码器和解码器 和模型
+    encoder = Encoder(enb_dim, src_vocab_size, hidden_dim)
+    decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim)
+    model = Seq2Seq(encoder, decoder)
+    model.eval()  # 切换为评估模式，不进行梯度计算
+    criterion = nn.NLLLoss() # 采用nn.NLLLOSS()计算损失
+    total_loss = 0
+    total_samples = 0
 
-if __name__ == '__main__':
-    # 定义数据处理字段
-    SRC = Field(tokenize_fn=word_tokenize, lower=True, init_token="<sos>", eos_token="<eos>")
-    TGT = Field(tokenize_fn=word_tokenize, lower=True, init_token="<sos>", eos_token="<eos>")
+    with torch.no_grad():  # 禁用梯度计算
+        for loader_src, loader_tgt in zip(read_data_to_dataloader(src_path, batch_size),read_data_to_dataloader(tgt_path,batch_size)):
+            for src_item, tgt_item in zip(loader_src, loader_tgt):
+                # 分词后的句子，根据对应语言的词表，生成代表词含义的vector
+                src_idx = torch.LongTensor([src_vocab[i] for i in src_item.split()])
+                tgt_idx = torch.LongTensor([tgt_vocab[i] for i in tgt_item.split()])
+                # 将每一个节点的vector传入list中。
+                vector_list = [x.unsqueeze(0) for x in src_idx]
+                # 第一轮要经过embedding层，后续则不需要
+                is_first_round = True
+                # 当列表中只有一个节点时代表递归完成
+                while len(vector_list) > 1:
+                    num_vector = len(vector_list)
+                    count = 0
+                    step = 0
+                    list = []
+                    # 不存在下一个节点时迭代完成
+                    while count + 1 < num_vector:
+                        if is_first_round:  # 第一轮要经过embedding层，后续则不需要
+                            embedded_left = encoder.embeddingl(vector_list[count])
+                            embedded_right = encoder.embeddingr(vector_list[count + 1])
+                        else:
+                            embedded_left = vector_list[count]
+                            embedded_right = vector_list[count + 1]
+                        # 传入模型
+                        # output_hidden = model(embedded_left, embedded_right, tgt_idx, is_first_round)
+                        output_hidden = encoder(embedded_left, embedded_right, is_first_round)
+                        # print(f"count{count}成功")
+                        count += 1
+                        # print(f"output_hidden.size()    {output_hidden.size()}")
+                        list.append(output_hidden)
+                    is_first_round = False
+                    vector_list = list
+                    step += 1
+                # 列表只剩下一个值为最终输出
+                output = vector_list[0]
+                # print(f"outputsize{output.size()}")
+                output, hidden = decoder(tgt_idx, output)
 
-    # 加载并处理数据集
-    train_src_data = [
-        "Je suis étudiant.",
-        "Elle aime danser.",
-        "Nous avons mangé une pizza.",
-        "Il fait beau aujourd'hui.",
-    ]
+                # 计算模型输出的序列和目标语言的序列之间的loss
+                loss = criterion(output, tgt_idx)
+                #loss = criterion(output.view(-1, output.shape[-1]), tgt_idx.view(-1))
+                total_loss += loss.item() * len(src_idx)
+                total_samples += len(src_idx)
+    # 计算平均损失
+    avg_loss = total_loss / total_samples
+    if mod == 'test':
+        print(f"test Loss: {avg_loss:.4f}")
+    else:
+        print(f"valid Loss: {avg_loss:.4f}")
 
-    train_tgt_data = [
-        "I am a student.",
-        "She loves to dance.",
-        "We ate a pizza.",
-        "The weather is nice today.",
-    ]
 
-    valid_src_data = [
-        "Je suis heureux.",
-        "Elle parle français.",
-    ]
+def compute_BLEU(src_filepath,tgt_filepath):
+    with open(src_filepath, 'r', encoding='utf-8') as ref_file:
+        reference_data = ref_file.readlines()
 
-    valid_tgt_data = [
-        "I am happy.",
-        "She speaks French.",
-    ]
+    with open(tgt_filepath, 'r', encoding='utf-8') as cand_file:
+        candidate_data = cand_file.readlines()
 
-    test_src_data = [
-        "Je suis fatigué.",
-        "Elle aime lire.",
-    ]
+    # 将参考和候选数据转换为适合计算 BLEU 的格式
+    references = [[ref.strip().split()] for ref in reference_data]
+    candidates = [cand.strip().split() for cand in candidate_data]
 
-    # 创建数据处理字段的词汇表
-    SRC.build_vocab(train_src_data)
-    TGT.build_vocab(train_tgt_data)
+    # 计算 BLEU 分数
+    bleu_score = corpus_bleu(references, candidates)
 
-    # 打印词汇表
-    print(SRC.vocab)
-    print(TGT.vocab)
+    return bleu_score
+
+
+
+
+
+
+
