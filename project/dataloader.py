@@ -77,7 +77,7 @@ def preprocess_sentence(sentence,init_token='<sos>',end_token='<eos>'):
     if not tokens[-1] == end_token:
         preprocess_tokens.append(end_token)
     preprocessed_sentence = ' '.join(preprocess_tokens)
-    print(preprocess_tokens)
+    #print(preprocess_tokens)
     return preprocessed_sentence
 
 class Field:
