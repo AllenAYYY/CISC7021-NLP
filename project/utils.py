@@ -22,7 +22,11 @@ from nltk.translate.bleu_score import corpus_bleu
 
 
 # 测试模型
-def test_model(src_path, tgt_path, batch_size,enb_dim,hidden_dim,mod):
+import torch
+import torch.nn as nn
+from nltk.translate.bleu_score import corpus_bleu
+
+def test_model(src_path, tgt_path, batch_size, enb_dim, hidden_dim, mod):
     '''
     :description: 用以实现模型测试
     :param src_path: 验证集源语言的src_path
@@ -40,19 +44,24 @@ def test_model(src_path, tgt_path, batch_size,enb_dim,hidden_dim,mod):
     tgt_vocab_size = len(data_loader.TGT_VOCAB)
     # 实例化 编码器和解码器 和模型
     encoder = Encoder(enb_dim, src_vocab_size, hidden_dim)
-    decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim)
+    decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim,tgt_vocab_size)
     model = Seq2Seq(encoder, decoder)
     model.eval()  # 切换为评估模式，不进行梯度计算
     criterion = nn.NLLLoss() # 采用nn.NLLLOSS()计算损失
     total_loss = 0
     total_samples = 0
+    src_unk_index = src_vocab['<unk>']
+    tgt_unk_index = tgt_vocab['<unk>']
+
+    references = []  # 存储参考翻译的句子列表
+    hypotheses = []  # 存储模型生成的句子列表
 
     with torch.no_grad():  # 禁用梯度计算
-        for loader_src, loader_tgt in zip(read_data_to_dataloader(src_path, batch_size),read_data_to_dataloader(tgt_path,batch_size)):
+        for loader_src, loader_tgt in zip(read_data_to_dataloader(src_path, batch_size), read_data_to_dataloader(tgt_path, batch_size)):
             for src_item, tgt_item in zip(loader_src, loader_tgt):
                 # 分词后的句子，根据对应语言的词表，生成代表词含义的vector
-                src_idx = torch.LongTensor([src_vocab[i] for i in src_item.split()])
-                tgt_idx = torch.LongTensor([tgt_vocab[i] for i in tgt_item.split()])
+                src_idx = torch.LongTensor([src_vocab.get(i, src_unk_index) for i in src_item.split()])
+                tgt_idx = torch.LongTensor([tgt_vocab.get(i, tgt_unk_index) for i in tgt_item.split()])
                 # 将每一个节点的vector传入list中。
                 vector_list = [x.unsqueeze(0) for x in src_idx]
                 # 第一轮要经过embedding层，后续则不需要
@@ -82,6 +91,8 @@ def test_model(src_path, tgt_path, batch_size,enb_dim,hidden_dim,mod):
                     vector_list = list
                     step += 1
                 # 列表只剩下一个值为最终输出
+                if vector_list == None or len(vector_list)==0:
+                    continue
                 output = vector_list[0]
                 # print(f"outputsize{output.size()}")
                 output, hidden = decoder(tgt_idx, output)
@@ -90,14 +101,25 @@ def test_model(src_path, tgt_path, batch_size,enb_dim,hidden_dim,mod):
                 loss = criterion(output, tgt_idx)
                 #loss = criterion(output.view(-1, output.shape[-1]), tgt_idx.view(-1))
                 total_loss += loss.item() * len(src_idx)
-                total_samples += len(src_idx)
-    # 计算平均损失
-    avg_loss = total_loss / total_samples
-    if mod == 'test':
-        print(f"test Loss: {avg_loss:.4f}")
-    else:
-        print(f"valid Loss: {avg_loss:.4f}")
+                # 将模型生成的句子和参考翻译加入列表
+                hypotheses.append(output.argmax(dim=1).tolist())
+                references.append(tgt_idx.tolist())
 
+                total_samples += len(src_idx)
+
+    avg_loss = total_loss / total_samples
+
+    references = [[str(word) for word in ref] for ref in references]
+    hypotheses = [[str(word) for word in hyp] for hyp in hypotheses]
+    # 计算BLEU分数
+    bleu_score = corpus_bleu(references, hypotheses)
+
+    if mod == 'test':
+        print(f"Test Loss: {avg_loss:.4f}")
+        print(f"Test BLEU Score: {bleu_score:.4f}")
+    else:
+        print(f"Valid Loss: {avg_loss:.4f}")
+        print(f"Valid BLEU Score: {bleu_score:.4f}")
 
 def compute_BLEU(src_filepath,tgt_filepath):
     with open(src_filepath, 'r', encoding='utf-8') as ref_file:
