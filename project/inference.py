@@ -64,7 +64,7 @@ def inference_sentence(src_sentence,hidden_size,enb_dim,model_path = find_latest
     src_vocab_size = len(src_vocab)
     tgt_vocab_size = len(tgt_vocab)
     encoder = Encoder(enb_dim, src_vocab_size, hidden_size)
-    decoder = Decoder(enb_dim, tgt_vocab_size, hidden_size)
+    decoder = Decoder(enb_dim, tgt_vocab_size, hidden_size,tgt_vocab_size)
     model = Seq2Seq(encoder, decoder)
     model.load_state_dict(torch.load(model_path),strict=False)
     #print(f"input_size:{input_size},hidden_size{hidden_size}")

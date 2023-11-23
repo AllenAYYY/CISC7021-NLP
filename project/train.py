@@ -72,7 +72,7 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
     tgt_vocab_size = len(data_loader.TGT_VOCAB)
     # 实例化编码器、解码器和模型
     encoder = Encoder(enb_dim, src_vocab_size, hidden_dim)
-    decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim)
+    decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim,tgt_vocab_size)
     model = Seq2Seq(encoder, decoder)
     # Adam优化
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -130,6 +130,8 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
                     is_first_round = False
                     vector_list = list
                     step += 1
+                if vector_list == None or len(vector_list)==0:
+                    continue
                 # 列表只剩下一个值为最终输出
                 output = vector_list[0]
                 #print(f"outputsize{output.size()}")
