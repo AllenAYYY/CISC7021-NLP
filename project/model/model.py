@@ -72,12 +72,12 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     #encoder = Encoder(enb_dim,french_input_size, hidden_dim)
     #decoder = Decoder(enb_dim, chinese_input_size,hidden_dim)
-    def __init__(self, enb_dim,  vocab_dim,hidden_dim):
+    def __init__(self, enb_dim,  vocab_dim,hidden_dim,output_dim):
         super(Decoder, self).__init__()
         self.hidden_dim = hidden_dim
         self.embedding = nn.Embedding(vocab_dim, enb_dim)
         self.gru = nn.GRU(enb_dim, hidden_dim)
-        self.linear = nn.Linear(hidden_dim, hidden_dim)
+        self.linear = nn.Linear(hidden_dim, output_dim)
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input,hidden):
