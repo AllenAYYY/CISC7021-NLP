@@ -8,6 +8,7 @@
 @Description  : 从数据集中获取数据,协助构建词表和预处理
 
 """
+import pickle
 import random
 
 # import package
@@ -135,6 +136,11 @@ def read_data_to_dataloader(file_path,batch_size=2, shuffle=False):
     dataset = MyDataset(file_path)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
     return dataloader
+
+def read_vocab(file_path):
+    with open(file_path, 'rb') as f:
+        vocab = pickle.load(f)
+    return vocab
 
 if __name__ == '__main__':
     src_file_path = "./datasets/train/train.src.fr"

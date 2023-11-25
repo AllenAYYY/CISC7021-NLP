@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import datetime
 import pickle
 from model.model import Encoder,Decoder,Seq2Seq
-from dataloader import DataLoaderBuildVocab,read_data_to_dataloader,preprocess_sentence
+from dataloader import DataLoaderBuildVocab,read_data_to_dataloader,preprocess_sentence,read_vocab
 from utils import test_model
 import os
 
@@ -30,14 +30,9 @@ MAX_LENGTH = 50
 src_file_path = "./datasets/train/train.src.fr"
 tgt_file_path = "./datasets/train/train.tgt.en"
 
-# 初始化DataLoader
-data_loader = DataLoaderBuildVocab(src_file_path, tgt_file_path)
-data_loader.read_to_build_vocab()
 
-# 源语言词表 & 目标语言词表
-SRC_VOCAB = data_loader.SRC_VOCAB
-TGT_VOCAB = data_loader.TGT_VOCAB
-
+src_vocab_file = "./model/vocab_result/vocab_src.pt"
+tgt_vocab_file = "./model/vocab_result/vocab_tgt.pt"
 
 
 # 保存词表
@@ -48,7 +43,7 @@ def save_vocab(vocab,epoch,tag):
         pickle.dump(vocab, f)
 
 # 训练模型
-def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,learning_rate = 0.001,batch_size=2,num_epoch=70,enb_dim = 30,hidden_dim=128):
+def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,learning_rate = 0.001,batch_size=2,num_epoch=70,enb_dim = 20,hidden_dim=32):
     '''
     :description: 实现模型的训练过程
     :param train_src_path: 训练集src_path
@@ -62,14 +57,24 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
     :param hidden_dim: 隐藏层维度
     :return: None. Only print
     '''
-    src_vocab = SRC_VOCAB
-    tgt_vocab = TGT_VOCAB
-    save_vocab(SRC_VOCAB,num_epoch,"src")
-    save_vocab(TGT_VOCAB,num_epoch,"tgt")
-    print(f"src词汇表 {src_vocab}")
-    print(f"tgt词汇表 {tgt_vocab}")
-    src_vocab_size = len(data_loader.SRC_VOCAB)
-    tgt_vocab_size = len(data_loader.TGT_VOCAB)
+
+    # 检查源语言词表和目标语言词表文件是否同时存在
+    if os.path.exists(src_vocab_file) and os.path.exists(tgt_vocab_file):
+        src_vocab = read_vocab(src_vocab_file)
+        tgt_vocab = read_vocab(tgt_vocab_file)
+        print("词表存在，不需要重新生成")
+        print(src_vocab)
+        print(tgt_vocab)
+    else:
+        # 初始化DataLoader
+        data_loader = DataLoaderBuildVocab(src_file_path, tgt_file_path)
+        data_loader.read_to_build_vocab()
+        src_vocab = data_loader.SRC_VOCAB
+        tgt_vocab = data_loader.TGT_VOCAB
+        save_vocab(src_vocab, num_epoch, "src")
+        save_vocab(tgt_vocab, num_epoch, "tgt")
+    src_vocab_size = len(src_vocab)
+    tgt_vocab_size = len(tgt_vocab)
     # 实例化编码器、解码器和模型
     encoder = Encoder(enb_dim, src_vocab_size, hidden_dim)
     decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim,tgt_vocab_size)
