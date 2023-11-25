@@ -13,17 +13,18 @@ from nltk.tokenize import word_tokenize
 import torch
 import torch.nn as nn
 from model.model import Encoder,Decoder,Seq2Seq
-from dataloader import DataLoaderBuildVocab,read_data_to_dataloader
+from dataloader import DataLoaderBuildVocab,read_data_to_dataloader,read_vocab,save_vocab
 from nltk.translate.bleu_score import corpus_bleu
 
 
-
-# 数据预处理
+src_vocab_file = "./model/vocab_result/vocab_src_valid.pt"
+tgt_vocab_file = "./model/vocab_result/vocab_tgt_valid.pt"
 
 
 # 测试模型
 import torch
 import torch.nn as nn
+import os
 from nltk.translate.bleu_score import corpus_bleu
 
 def test_model(src_path, tgt_path, batch_size, enb_dim, hidden_dim, mod):
@@ -36,12 +37,24 @@ def test_model(src_path, tgt_path, batch_size, enb_dim, hidden_dim, mod):
     :param hidden_dim: 隐藏层维度
     :return: None. Only print
     '''
-    data_loader = DataLoaderBuildVocab(src_path, tgt_path)
-    data_loader.read_to_build_vocab()
-    src_vocab = data_loader.SRC_VOCAB
-    tgt_vocab = data_loader.TGT_VOCAB
-    src_vocab_size = len(data_loader.SRC_VOCAB)
-    tgt_vocab_size = len(data_loader.TGT_VOCAB)
+    # 检查源语言词表和目标语言词表文件是否同时存在
+    if os.path.exists(src_vocab_file) and os.path.exists(tgt_vocab_file):
+        src_vocab = read_vocab(src_vocab_file)
+        tgt_vocab = read_vocab(tgt_vocab_file)
+        print("valid 词表存在，不需要重新生成")
+        #print(src_vocab)
+        #print(tgt_vocab)
+    else:
+        # 初始化DataLoader
+        data_loader = DataLoaderBuildVocab(src_path, tgt_path)
+        data_loader.read_to_build_vocab()
+        src_vocab = data_loader.SRC_VOCAB
+        tgt_vocab = data_loader.TGT_VOCAB
+        save_vocab(src_vocab, "src","valid")
+        save_vocab(tgt_vocab, "tgt","valid")
+        print("已生成新的valid词表")
+    src_vocab_size = len(src_vocab)
+    tgt_vocab_size = len(tgt_vocab)
     # 实例化 编码器和解码器 和模型
     encoder = Encoder(enb_dim, src_vocab_size, hidden_dim)
     decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim,tgt_vocab_size)

@@ -142,6 +142,16 @@ def read_vocab(file_path):
         vocab = pickle.load(f)
     return vocab
 
+# 保存词表
+def save_vocab(vocab,tag,mod):
+    #file_path = "./model/vocab_result/" + f"vocab_epoch{epoch}_{tag}.pt"
+    file_path = f"./model/vocab_result/vocab_{tag}"
+    if mod == "valid":
+        file_path += "_valid"
+    file_path += ".pt"
+    with open(file_path, 'wb') as f:
+        pickle.dump(vocab, f)
+
 if __name__ == '__main__':
     src_file_path = "./datasets/train/train.src.fr"
     tgt_file_path = "./datasets/train/train.tgt.en"

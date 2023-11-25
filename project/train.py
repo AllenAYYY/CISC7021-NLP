@@ -2,9 +2,9 @@
 """
 
 @File    :   train.py  
-@Modify Time : 2023/11/15 20:45 
-@Author  :  Allen.Yang  
-@Contact :   MC36514@um.edu.mo        
+@Modify Time : 2023/11/15 20:45
+@Author  :  Allen.Yang
+@Contact :   MC36514@um.edu.mo
 @Description  : 此文件用于实现模型训练、测试
 
 """
@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import datetime
 import pickle
 from model.model import Encoder,Decoder,Seq2Seq
-from dataloader import DataLoaderBuildVocab,read_data_to_dataloader,preprocess_sentence,read_vocab
+from dataloader import DataLoaderBuildVocab,read_data_to_dataloader,preprocess_sentence,read_vocab,save_vocab
 from utils import test_model
 import os
 
@@ -35,12 +35,6 @@ src_vocab_file = "./model/vocab_result/vocab_src.pt"
 tgt_vocab_file = "./model/vocab_result/vocab_tgt.pt"
 
 
-# 保存词表
-def save_vocab(vocab,epoch,tag):
-    #file_path = "./model/vocab_result/" + f"vocab_epoch{epoch}_{tag}.pt"
-    file_path = "./model/vocab_result/" + f"vocab_{tag}.pt"
-    with open(file_path, 'wb') as f:
-        pickle.dump(vocab, f)
 
 # 训练模型
 def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,learning_rate = 0.001,batch_size=2,num_epoch=70,enb_dim = 20,hidden_dim=32):
@@ -71,8 +65,8 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
         data_loader.read_to_build_vocab()
         src_vocab = data_loader.SRC_VOCAB
         tgt_vocab = data_loader.TGT_VOCAB
-        save_vocab(src_vocab, num_epoch, "src")
-        save_vocab(tgt_vocab, num_epoch, "tgt")
+        save_vocab(src_vocab, "src","train")
+        save_vocab(tgt_vocab, num_epoch, "tgt","train")
     src_vocab_size = len(src_vocab)
     tgt_vocab_size = len(tgt_vocab)
     # 实例化编码器、解码器和模型
@@ -178,4 +172,5 @@ if __name__ == '__main__':
     test_src_path = "./datasets/test/test.src.fr"
     test_tgt_path = "./datasets/test/test.tgt.en"
     train_model(src_file_path, tgt_file_path, valid_src_path, valid_tgt_path,num_epoch=100)
+
 
