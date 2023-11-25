@@ -61,7 +61,7 @@ class Encoder(nn.Module):
         #print(f"h_tem.size()                  {h_tem.size()}")
         #print(bias[0][1].item())
         #print(h_tem.size())
-        hidden_output = bias[0][1].item()*h_tem + bias[0][1].item()*left_hidden + bias[0][2].item()*right_hidden
+        hidden_output = bias[0][0].item()*h_tem + bias[0][1].item()*left_hidden + bias[0][2].item()*right_hidden
         #print(f"hidden_output****        {hidden_output}")
         # 第一轮需要用Linear转尺寸
         if is_first:
