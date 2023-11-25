@@ -8,6 +8,7 @@
 @Description  : 从数据集中获取数据,协助构建词表和预处理
 
 """
+import pickle
 import random
 
 # import package
@@ -135,6 +136,21 @@ def read_data_to_dataloader(file_path,batch_size=2, shuffle=False):
     dataset = MyDataset(file_path)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
     return dataloader
+
+def read_vocab(file_path):
+    with open(file_path, 'rb') as f:
+        vocab = pickle.load(f)
+    return vocab
+
+# 保存词表
+def save_vocab(vocab,tag,mod):
+    #file_path = "./model/vocab_result/" + f"vocab_epoch{epoch}_{tag}.pt"
+    file_path = f"./model/vocab_result/vocab_{tag}"
+    if mod == "valid":
+        file_path += "_valid"
+    file_path += ".pt"
+    with open(file_path, 'wb') as f:
+        pickle.dump(vocab, f)
 
 if __name__ == '__main__':
     src_file_path = "./datasets/train/train.src.fr"
