@@ -26,15 +26,17 @@ import torch
 import torch.nn as nn
 import os
 from nltk.translate.bleu_score import corpus_bleu
+from dataloader import preprocess_sentence
 
 def test_model(src_path, tgt_path, batch_size, enb_dim, hidden_dim, mod):
     '''
     :description: 用以实现模型测试
-    :param src_path: 验证集源语言的src_path
-    :param tgt_path:  验证集目标语言的tgt_path
+    :param src_path: 验证集或测试集源语言的src_path
+    :param tgt_path:  验证集或测试集目标语言的tgt_path
     :param batch_size: 批处理大小
     :param enb_dim: 词映射为vector的尺寸
     :param hidden_dim: 隐藏层维度
+    :param mod: 测试集or验证集标志位
     :return: None. Only print
     '''
     # 检查源语言词表和目标语言词表文件是否同时存在
@@ -72,6 +74,10 @@ def test_model(src_path, tgt_path, batch_size, enb_dim, hidden_dim, mod):
     with torch.no_grad():  # 禁用梯度计算
         for loader_src, loader_tgt in zip(read_data_to_dataloader(src_path, batch_size), read_data_to_dataloader(tgt_path, batch_size)):
             for src_item, tgt_item in zip(loader_src, loader_tgt):
+                src_item = preprocess_sentence(src_item)
+                tgt_item = preprocess_sentence(tgt_item)
+                if src_item == None or tgt_item == None:
+                    continue
                 # 分词后的句子，根据对应语言的词表，生成代表词含义的vector
                 src_idx = torch.LongTensor([src_vocab.get(i, src_unk_index) for i in src_item.split()])
                 tgt_idx = torch.LongTensor([tgt_vocab.get(i, tgt_unk_index) for i in tgt_item.split()])
@@ -107,18 +113,19 @@ def test_model(src_path, tgt_path, batch_size, enb_dim, hidden_dim, mod):
                 if vector_list == None or len(vector_list)==0:
                     continue
                 output = vector_list[0]
+                encoder_output = output
                 # print(f"outputsize{output.size()}")
-                output, hidden = decoder(tgt_idx, output)
+                output, hidden = decoder(tgt_idx, output,encoder_output)
 
                 # 计算模型输出的序列和目标语言的序列之间的loss
                 loss = criterion(output, tgt_idx)
                 #loss = criterion(output.view(-1, output.shape[-1]), tgt_idx.view(-1))
-                total_loss += loss.item() * len(src_idx)
+                total_loss += loss.item()
                 # 将模型生成的句子和参考翻译加入列表
                 hypotheses.append(output.argmax(dim=1).tolist())
                 references.append(tgt_idx.tolist())
 
-                total_samples += len(src_idx)
+                total_samples += 1
 
     avg_loss = total_loss / total_samples
 
