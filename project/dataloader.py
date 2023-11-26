@@ -20,6 +20,8 @@ import re
 
 # 从spacy加载法语分词器
 nlp_fr = spacy.load("fr_core_news_sm")
+min_freq = 5
+vocab_size = 5000
 
 # 定义法语分词函数
 def fr_word_tokenize(text):
@@ -69,6 +71,8 @@ def preprocess_sentence(sentence,init_token='<sos>',end_token='<eos>'):
     sentence = re.sub(r"([^\s\w]|_)+", " ", sentence)
     # 使用nltk分词工具进行分词
     tokens = word_tokenize(sentence)
+    if tokens == None or len(tokens) == 0:
+        return None
     tokens = [token.lower() for token in tokens]
     preprocess_tokens = []
     # 为输入的句子做添加开始符号和结束符号
@@ -106,8 +110,12 @@ class Field:
             tokens.extend(sentence_tokens)
         # 构建字典
         freq_dist = nltk.FreqDist(tokens)
+        sorted_tokens = sorted(freq_dist.items(), key=lambda x: x[1], reverse=True)
+        # 选择词频前5000的单词
+        vocab_tokens = [token for token, freq in sorted_tokens if freq >= min_freq][:vocab_size]
         # 生成词表
-        self.vocab = {token: idx for idx, (token, _) in enumerate(freq_dist.items())}
+        self.vocab = {token: idx for idx, token in enumerate(vocab_tokens)}
+
         # 添加未知词符号
         self.vocab['<unk>'] = len(self.vocab)
         return self.vocab

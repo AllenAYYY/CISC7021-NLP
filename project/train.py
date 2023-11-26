@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import datetime
-import pickle
+import time
 from model.model import Encoder,Decoder,Seq2Seq
 from dataloader import DataLoaderBuildVocab,read_data_to_dataloader,preprocess_sentence,read_vocab,save_vocab
 from utils import test_model
@@ -37,7 +37,7 @@ tgt_vocab_file = "./model/vocab_result/vocab_tgt.pt"
 
 
 # 训练模型
-def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,learning_rate = 0.001,batch_size=2,num_epoch=70,enb_dim = 20,hidden_dim=32):
+def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,learning_rate = 0.001,batch_size=64,num_epoch=70,enb_dim = 20,hidden_dim=32):
     '''
     :description: 实现模型的训练过程
     :param train_src_path: 训练集src_path
@@ -66,7 +66,7 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
         src_vocab = data_loader.SRC_VOCAB
         tgt_vocab = data_loader.TGT_VOCAB
         save_vocab(src_vocab, "src","train")
-        save_vocab(tgt_vocab, num_epoch, "tgt","train")
+        save_vocab(tgt_vocab, "tgt","train")
     src_vocab_size = len(src_vocab)
     tgt_vocab_size = len(tgt_vocab)
     # 实例化编码器、解码器和模型
@@ -81,6 +81,7 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
     src_unk_index = src_vocab['<unk>']
     tgt_unk_index = tgt_vocab['<unk>']
     for epoch in range(1,num_epoch+1):
+        start_time = time.time()  # 记录开始时间
         # 加载批次loader
         for loader_src,loader_tgt in zip(read_data_to_dataloader(train_src_path, batch_size),read_data_to_dataloader(train_tgt_path,batch_size)):
             #print(f"源{loader_src},目标{loader_tgt}")
@@ -88,13 +89,11 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
             for src_item,tgt_item in zip(loader_src,loader_tgt):
                 src_item = preprocess_sentence(src_item)
                 tgt_item = preprocess_sentence(tgt_item)
+                if src_item == None or tgt_item == None:
+                    continue
                 #print(f"源{src_item},目标{tgt_item}")
                 # 从词表获取语言序列
-                #src_idx = torch.LongTensor([src_vocab[i] for i in src_item.split()])
-                #tgt_idx = torch.LongTensor([tgt_vocab[i] for i in tgt_item.split()])
                 # 找不到就转成未知词
-
-
                 src_idx = torch.LongTensor([src_vocab.get(i, src_unk_index) for i in src_item.split()])
                 #print(src_idx)
                 tgt_idx = torch.LongTensor([tgt_vocab.get(i, tgt_unk_index) for i in tgt_item.split()])
@@ -133,24 +132,24 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
                     continue
                 # 列表只剩下一个值为最终输出
                 output = vector_list[0]
-                #print(f"outputsize{output.size()}")
-                output, hidden = decoder(tgt_idx, output)
-                #print(f"output    {output}")
-                #output = output.expand(len(tgt_idx), -1)
-                #print(f"output_size:{output.size()}")
-                #print(f"tgt_size:{tgt_idx.size()}")
-
+                encoder_output = output
+                output, hidden = decoder(tgt_idx, output,encoder_output)
                 # 解码器输出和目标语言的序列计算loss
                 loss = criterion(output, tgt_idx)
                 loss.backward()
                 loss_result = loss.item()
                 optimizer.step()
         loss_history.append(loss_result)
-        print(f"第{epoch}轮 Train Loss: {loss_result}")
-        if epoch  % 10 == 0:
+        end_time = time.time()  # 记录结束时间
+        elapsed_time = end_time - start_time  # 计算耗时
+        minutes = int(elapsed_time // 60)  # 计算分钟数
+        seconds = int(elapsed_time % 60)  # 计算剩余的秒数
+
+        print(f"第{epoch}轮 Train Loss: {loss_result}    耗时: {minutes}分{seconds}秒")
+        if epoch  % 100 == 0:
             #print(f"Epoch: {epoch}, Valid Loss: {loss_result:.4f}")
             test_model(valid_src_path,valid_tgt_path,batch_size,enb_dim,hidden_dim,"valid")
-        if epoch % 50 == 0:
+        if epoch % 100 == 0:
             current_time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             model_path = f"./model/model_result/model_epoch{epoch}_{current_time}.pt"
             torch.save(model.state_dict(), model_path)
@@ -171,6 +170,6 @@ if __name__ == '__main__':
     valid_tgt_path = "./datasets/valid/valid.tgt.en"
     test_src_path = "./datasets/test/test.src.fr"
     test_tgt_path = "./datasets/test/test.tgt.en"
-    train_model(src_file_path, tgt_file_path, valid_src_path, valid_tgt_path,num_epoch=100)
+    train_model(src_file_path, tgt_file_path, valid_src_path, valid_tgt_path,num_epoch=10000)
 
 
