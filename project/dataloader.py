@@ -113,6 +113,8 @@ class Field:
         sorted_tokens = sorted(freq_dist.items(), key=lambda x: x[1], reverse=True)
         # 选择词频前5000的单词
         vocab_tokens = [token for token, freq in sorted_tokens if freq >= min_freq][:vocab_size]
+        vocab_tokens.append(self.init_token)
+        vocab_tokens.append(self.eos_token)
         # 生成词表
         self.vocab = {token: idx for idx, token in enumerate(vocab_tokens)}
 
