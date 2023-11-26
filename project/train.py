@@ -37,7 +37,7 @@ tgt_vocab_file = "./model/vocab_result/vocab_tgt.pt"
 
 
 # 训练模型
-def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,learning_rate = 0.001,batch_size=64,num_epoch=70,enb_dim = 20,hidden_dim=32):
+def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,learning_rate = 0.001,batch_size=64,num_epoch=70,enb_dim = 10,hidden_dim=16):
     '''
     :description: 实现模型的训练过程
     :param train_src_path: 训练集src_path
@@ -57,8 +57,8 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
         src_vocab = read_vocab(src_vocab_file)
         tgt_vocab = read_vocab(tgt_vocab_file)
         print("词表存在，不需要重新生成")
-        print(src_vocab)
-        print(tgt_vocab)
+        #print(src_vocab)
+        #print(tgt_vocab)
     else:
         # 初始化DataLoader
         data_loader = DataLoaderBuildVocab(src_file_path, tgt_file_path)
@@ -67,8 +67,11 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
         tgt_vocab = data_loader.TGT_VOCAB
         save_vocab(src_vocab, "src","train")
         save_vocab(tgt_vocab, "tgt","train")
+        print("词表不存在，需要重新生成")
     src_vocab_size = len(src_vocab)
     tgt_vocab_size = len(tgt_vocab)
+    print(src_vocab)
+    print(tgt_vocab)
     # 实例化编码器、解码器和模型
     encoder = Encoder(enb_dim, src_vocab_size, hidden_dim)
     decoder = Decoder(enb_dim, tgt_vocab_size, hidden_dim,tgt_vocab_size)
@@ -86,6 +89,7 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
         for loader_src,loader_tgt in zip(read_data_to_dataloader(train_src_path, batch_size),read_data_to_dataloader(train_tgt_path,batch_size)):
             #print(f"源{loader_src},目标{loader_tgt}")
             # 加载批中的每一对训练语言
+            loader_count = 0
             for src_item,tgt_item in zip(loader_src,loader_tgt):
                 src_item = preprocess_sentence(src_item)
                 tgt_item = preprocess_sentence(tgt_item)
@@ -139,6 +143,8 @@ def train_model(train_src_path,train_tgt_path,valid_src_path,valid_tgt_path,lear
                 loss.backward()
                 loss_result = loss.item()
                 optimizer.step()
+            print(f"第{loader_count+1}个loader完成")
+            loader_count += 1
         loss_history.append(loss_result)
         end_time = time.time()  # 记录结束时间
         elapsed_time = end_time - start_time  # 计算耗时
